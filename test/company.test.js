@@ -31,6 +31,10 @@ console.log('company.js');
 
 assert(LJF.normalizeName('  Acme  Corp! ') === 'acme corp', 'normalizeName collapses spaces/punct');
 assert(LJF.normalizeName('Café & Co') === 'cafe and co', 'normalizeName strips accents and &');
+assert(
+  LJF.normalizeName('Copyright Clearance Center (CCC)') === 'copyright clearance center',
+  'normalizeName strips parenthetical suffix'
+);
 
 const byId = LJF.parseCompanyHref('https://www.linkedin.com/company/12345678/?trk=foo');
 assert(byId.companyId === '12345678', 'parseCompanyHref extracts numeric id');
@@ -74,6 +78,29 @@ assert(
   !LJF.matchesBlocked({ key: 'name:other', companyId: null, displayName: 'Other' }, blocked),
   'matchesBlocked rejects unrelated'
 );
+
+const blockedByUrl = {
+  'url:/company/hasten-group/': {
+    key: 'url:/company/hasten-group/',
+    companyUrl: 'https://www.linkedin.com/company/hasten-group/',
+    displayName: 'Hasten Group',
+    aliases: ['url:/company/hasten-group/', 'name:hasten group', 'slug:hasten-group'],
+  },
+};
+assert(
+  LJF.matchesBlocked({ key: 'name:hasten group', displayName: 'Hasten Group' }, blockedByUrl),
+  'matchesBlocked url entry vs name identity'
+);
+assert(
+  LJF.matchesBlocked(
+    { key: 'name:hasten', displayName: 'Hasten', jobId: '4477370692' },
+    blockedByUrl,
+    { '4477370692': { companySlug: 'hasten-group', companyName: 'Hasten Group' } }
+  ),
+  'matchesBlocked via jobMap enrichment'
+);
+
+assert(LJF.extractJobIdFromCard, 'extractJobIdFromCard exported');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -1,11 +1,13 @@
 /**
- * Popup: list and unblock blocked companies (logo + LinkedIn link when available).
+ * Popup: list/unblock + opt-in native dismiss setting.
  */
 (function () {
   'use strict';
 
   const listRoot = document.getElementById('list-root');
   const countEl = document.getElementById('count');
+  const optDismiss = document.getElementById('opt-dismiss');
+  const dismissStatus = document.getElementById('dismiss-status');
 
   function formatDate(iso) {
     if (!iso) return '';
@@ -128,10 +130,32 @@
     listRoot.appendChild(ul);
   }
 
+  function refreshDismissStatus() {
+    return Promise.all([LJF.storage.getSettings(), LJF.storage.getDismissCapture()]).then(
+      function (pair) {
+        const settings = pair[0] || {};
+        const capture = pair[1];
+        optDismiss.checked = !!settings.useNativeDismiss;
+        if (capture && capture.capturedAt) {
+          dismissStatus.textContent =
+            'Plantilla dismiss capturada: ' + formatDate(capture.capturedAt) + '.';
+        } else {
+          dismissStatus.textContent =
+            'Sin plantilla aún. En Jobs: localStorage.ljfDebug="1", recarga, abre ⋯ en una tarjeta y pulsa Descartar una vez.';
+        }
+      }
+    );
+  }
+
+  optDismiss.addEventListener('change', function () {
+    LJF.storage.saveSettings({ useNativeDismiss: !!optDismiss.checked }).then(refreshDismissStatus);
+  });
+
   function refresh() {
     return LJF.storage.getBlockedCompanies().then(render);
   }
 
   refresh();
+  refreshDismissStatus();
   LJF.storage.onBlockedChange(render);
 })();
