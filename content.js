@@ -176,14 +176,17 @@
 
     LJF.storage.onBlockedChange(function (map) {
       blockedCompanies = map || {};
-      // Clear processed flag so buttons refresh after unblock
-      document.querySelectorAll('[' + PROCESSED_ATTR + ']').forEach(function (el) {
-        el.removeAttribute(PROCESSED_ATTR);
-        const btn = el.querySelector('.' + BTN_CLASS);
-        if (btn) btn.remove();
-        el.classList.remove(HIDDEN_CLASS);
-      });
+      resetProcessedCards();
       scanAndApply();
+    });
+  }
+
+  function resetProcessedCards() {
+    document.querySelectorAll('[' + PROCESSED_ATTR + ']').forEach(function (el) {
+      el.removeAttribute(PROCESSED_ATTR);
+      const btn = el.querySelector('.' + BTN_CLASS);
+      if (btn) btn.remove();
+      el.classList.remove(HIDDEN_CLASS);
     });
   }
 
@@ -197,5 +200,13 @@
   globalThis.LJFContent = {
     scanAndApply: scanAndApply,
     scheduleScan: scheduleScan,
+    refreshFromStorage: function refreshFromStorage() {
+      return LJF.storage.loadAll().then(function (all) {
+        blockedCompanies = all.blockedCompanies || {};
+        settings = all.settings || settings;
+        resetProcessedCards();
+        scanAndApply();
+      });
+    },
   };
 })();

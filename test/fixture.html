@@ -161,6 +161,11 @@
 
         document.getElementById('btn-unblock-all').addEventListener('click', function () {
           LJF.storage._saveBlocked({}).then(function () {
+            if (globalThis.LJFContent && LJFContent.refreshFromStorage) {
+              return LJFContent.refreshFromStorage().then(function () {
+                setStatus('Lista negra vaciada.');
+              });
+            }
             setStatus('Lista negra vaciada.');
           });
         });
