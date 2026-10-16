@@ -48,6 +48,8 @@ const fs = require('fs');
   console.log('after block', after);
 
   if (after.hidden < 1) throw new Error('Expected Hasten Group card hidden in lazy-column');
+  const blockedAttr = await page.locator('[data-testid="lazy-column"] [data-ljf-blocked="1"]').count();
+  if (blockedAttr < 1) throw new Error('Expected data-ljf-blocked=1 on hidden cards');
   const entry = Object.values(after.storage)[0];
   if (!entry || !/hasten/i.test(entry.displayName)) throw new Error('Expected Hasten in storage');
   if (!entry.companyUrl || entry.companyUrl.indexOf('/company/hasten-group') === -1) {

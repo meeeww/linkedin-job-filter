@@ -1,4 +1,4 @@
-/* LinkedIn Job Filter — button + hide states */
+/* LinkedIn Job Filter — button + robust hide states */
 
 /* Block button — only injected in the job detail pane */
 .ljf-block-btn {
@@ -41,9 +41,28 @@
   pointer-events: none;
 }
 
-/* Default hide mode: remove from layout */
-.ljf-hidden {
+/*
+ * Robust hide: attribute selector is harder for LinkedIn CSS modules to accidentally
+ * clear than a class alone. Multiple properties defeat display:flex !important peers
+ * depending on stylesheet order — content.js also sets inline !important.
+ */
+[data-ljf-blocked='1'],
+[data-ljf-blocked='1'][role='button'],
+div[data-ljf-blocked='1'],
+li[data-ljf-blocked='1'],
+.ljf-hidden,
+hr[data-ljf-blocked='1'] {
   display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  border: 0 !important;
 }
 
 /* Post-MVP collapse mode (class reserved) */

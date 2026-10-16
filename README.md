@@ -351,8 +351,11 @@ Notas:
 
 - El content script se inyecta en **todo** `linkedin.com` (para sobrevivir navegación SPA) pero solo actúa en rutas `/jobs/*`.
 - En `/jobs/search-results/` la lista es `[data-testid=lazy-column][componentkey=SearchResultsMainContent]`; las tarjetas son `div[role=button][componentkey^=job-card-component-ref-]`.
-- **Ocultación** se aplica a esas tarjetas de la lista. El botón **Bloquear empresa** solo aparece en el panel de detalle (`data-sdui-screen*="SemanticJobDetails"`), junto al enlace/logo de empresa (ahí sí hay `/company/` + logo).
-- Entradas antiguas del popup sin logo/URL muestran un placeholder y un enlace de búsqueda de empresas en LinkedIn.
+- **Ocultación** usa `data-ljf-blocked="1"` + CSS `!important` + estilo inline `!important`, y se reaplica en cada mutación (RSC/React puede recrear nodos).
+- El botón **Bloquear empresa** solo aparece en el panel de detalle (`SemanticJobDetails`).
+- `page-bridge.js` (world MAIN) intercepta fetch RSC para mapear `jobId → empresa` y puede capturar el body del dismiss nativo.
+- Opt-in en el popup: «Usar dismiss nativo de LinkedIn» (experimental; requiere plantilla capturada). No guarda cookies.
+- Si tras bloquear `LJFDebug.status()` muestra `hidden: 0` con `blockedCount > 0`, compara `blockedKeys` con `samples[].keys`.
 
 ### Requisitos
 
