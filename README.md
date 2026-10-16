@@ -65,6 +65,7 @@ Extensión de **Google Chrome (Manifest V3)** en JavaScript y CSS puro, sin back
 | Página / contexto | Prioridad | Notas |
 | --- | --- | --- |
 | Búsqueda de empleos `/jobs/search` | MVP | Lista de tarjetas + scroll infinito |
+| Búsqueda semántica `/jobs/search-results/` | MVP | UI SDUI nueva (`componentkey=job-card-component-ref-*`); empresa suele ser texto en `<p>`, sin enlace `/company/` |
 | Colecciones `/jobs/collections/*` | Post-MVP temprano | Misma lógica de tarjetas, selectores pueden diferir |
 | Panel / vista de detalle de empleo | Post-MVP temprano | Botón en cabecera de la oferta abierta |
 | Posts de empleo en el feed (`/feed`) | Más adelante | Selectores distintos; menor prioridad |
@@ -95,8 +96,10 @@ linkedin-job-filter/
 │   ├── icon48.png
 │   └── icon128.png
 └── test/
-    ├── fixture.html          # Página local que simula tarjetas de empleo
-    └── company.test.js       # Checks de normalización de claves (Node)
+    ├── fixture.html                    # Fixture legacy simplificado
+    ├── fixture-search-results.html     # Markup real recortado de /jobs/search-results/
+    ├── company.test.js                 # Checks de normalización de claves (Node)
+    └── fixture-search-results.playwright.js  # Smoke test opcional (Playwright)
 ```
 
 ### Responsabilidades
@@ -307,14 +310,14 @@ Formato propuesto: **JSON** versionado.
 5. Abrir LinkedIn Jobs (`/jobs/search`) y comprobar el botón y la ocultación.
 6. Tras cada cambio en JS/CSS: recargar la extensión (icono de actualizar en `chrome://extensions`) y refrescar la pestaña de LinkedIn.
 
-### Prueba local sin LinkedIn (fixture)
+### Prueba local sin LinkedIn (fixtures)
 
 Sin cuenta de LinkedIn puedes validar la lógica de detección, botón, bloqueo, ocultación y `MutationObserver`:
 
-1. Abre `test/fixture.html` directamente en Chrome (`Archivo → Abrir archivo…`, o arrastra el HTML a una pestaña).
-2. Debe aparecer el botón **Bloquear empresa** en cada tarjeta simulada.
-3. Al bloquear, las tarjetas de esa empresa se ocultan; **Añadir tarjeta** simula scroll infinito.
-4. **Desbloquear todas** vacía la lista en memoria; **Ver storage** muestra el mapa actual en la barra de estado.
+1. Abre `test/fixture.html` (markup simplificado legacy) o **`test/fixture-search-results.html`** (recortado de una página real `/jobs/search-results/`).
+2. Debe aparecer el botón **Bloquear empresa** en cada tarjeta.
+3. Al bloquear, las tarjetas de esa empresa se ocultan; en el fixture legacy **Añadir tarjeta** simula scroll infinito.
+4. **Desbloquear todas** vacía la lista en memoria; **Ver storage** / **LJFDebug.scan()** ayudan a inspeccionar.
 
 Checks de normalización de claves (Node):
 
@@ -322,7 +325,32 @@ Checks de normalización de claves (Node):
 node test/company.test.js
 ```
 
-> El fixture usa un `chrome.storage` en memoria (fallback de `lib/storage.js`). En LinkedIn real se usa `chrome.storage.local` de la extensión cargada unpacked.
+> Los fixtures usan un `chrome.storage` en memoria (fallback de `lib/storage.js`). En LinkedIn real se usa `chrome.storage.local` de la extensión cargada unpacked.
+
+### Depuración en LinkedIn real
+
+1. Recarga la extensión unpacked y la pestaña de Jobs.
+2. Abre la consola de la página (F12) y ejecuta:
+
+```js
+localStorage.ljfDebug = '1';
+location.reload();
+```
+
+3. Tras recargar deberías ver logs `[LJF]`. Luego:
+
+```js
+LJFDebug.status(); // tarjetas / empresas / botones detectados
+LJFDebug.scan();   // fuerza un re-escaneo
+```
+
+4. Si `cards` o `withCompany` son 0, copia el resultado de `LJFDebug.status()` (incluye `samples`) al issue/PR.
+5. Desactivar: `LJFDebug.disable()` o `localStorage.removeItem('ljfDebug')`.
+
+Notas:
+
+- El content script se inyecta en **todo** `linkedin.com` (para sobrevivir navegación SPA) pero solo actúa en rutas `/jobs/*`.
+- En `/jobs/search-results/` las tarjetas son `div[role=button][componentkey^=job-card-component-ref-]`; la empresa se infiere del texto de los `<p>` cuando no hay enlace `/company/`.
 
 ### Requisitos
 
