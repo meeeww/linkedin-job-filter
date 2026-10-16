@@ -1,16 +1,19 @@
 /**
  * LinkedIn Job Filter — content script
- * Injects «Bloquear empresa», hides blocked companies, watches for scroll-loaded cards.
- * Runs on all linkedin.com pages but only activates on /jobs/* routes (SPA-safe).
+ *
+ * - Hide blocked companies in the results lazy-column (incl. scroll-loaded cards)
+ * - Show «Bloquear empresa» ONLY in the job detail pane (not in the list)
+ * - Capture logo + company URL from the detail pane when blocking
  */
 (function () {
   'use strict';
 
   const PROCESSED_ATTR = 'data-ljf-processed';
+  const DETAIL_PROCESSED_ATTR = 'data-ljf-detail-processed';
   const BTN_CLASS = 'ljf-block-btn';
   const HIDDEN_CLASS = 'ljf-hidden';
   const DEBOUNCE_MS = 120;
-  const VERSION = '0.1.1';
+  const VERSION = '0.2.0';
 
   let blockedCompanies = {};
   let settings = Object.assign({}, LJF.storage.DEFAULT_SETTINGS);
@@ -26,7 +29,7 @@
       if (location && /(?:\?|&)ljfDebug=1(?:&|$)/.test(location.search)) return true;
       if (typeof localStorage !== 'undefined' && localStorage.getItem('ljfDebug') === '1') return true;
     } catch (_) {
-      /* private mode / blocked storage */
+      /* private mode */
     }
     return false;
   }
@@ -50,7 +53,6 @@
     if (globalThis.__LJF_FORCE_JOBS__ === true) return true;
     const path = pathname || (location && location.pathname) || '';
     if (/^\/jobs(\/|$)/i.test(path)) return true;
-    // Local HTML fixtures (file://.../test/fixture*.html)
     try {
       const href = location && location.href ? location.href : '';
       if (/fixture.*\.html/i.test(href) || /\/test\/fixture/i.test(path)) return true;
@@ -60,12 +62,43 @@
     return false;
   }
 
-  function findListRoot() {
-    return LJF.queryFirst(LJF.selectors.jobListRoots, document) || document.body;
+  function findObserverRoot() {
+    return (
+      LJF.findResultsListRoot(document) ||
+      LJF.queryFirst(LJF.selectors.jobListRoots, document) ||
+      document.body
+    );
   }
 
-  function getAnchor(card) {
-    return (LJF.findButtonAnchor && LJF.findButtonAnchor(card)) || card;
+  function hideCardRow(card) {
+    card.classList.add(HIDDEN_CLASS);
+    // Also hide the following <hr> separator used between SDUI cards
+    const next = card.nextElementSibling;
+    if (next && next.tagName === 'HR') {
+      next.classList.add(HIDDEN_CLASS);
+    }
+  }
+
+  function showCardRow(card) {
+    card.classList.remove(HIDDEN_CLASS);
+    const next = card.nextElementSibling;
+    if (next && next.tagName === 'HR') {
+      next.classList.remove(HIDDEN_CLASS);
+    }
+  }
+
+  function removeListButtons(scope) {
+    const root = scope || document;
+    // Strip any legacy buttons inside the results list
+    const list = LJF.findResultsListRoot(document);
+    const nodes = root.querySelectorAll('.' + BTN_CLASS);
+    Array.prototype.forEach.call(nodes, function (btn) {
+      if (list && list.contains(btn)) {
+        btn.remove();
+      } else if (LJF.isInResultsList(btn)) {
+        btn.remove();
+      }
+    });
   }
 
   function createBlockButton(identity) {
@@ -89,7 +122,7 @@
         btn.disabled = true;
         btn.textContent = 'Bloqueando…';
         LJF.storage
-          .blockCompany(identity, 'job-card')
+          .blockCompany(identity, 'job-detail')
           .then(function () {
             return LJF.storage.getBlockedCompanies();
           })
@@ -109,104 +142,156 @@
     return btn;
   }
 
-  function shouldHide(identity) {
-    if (!identity) return false;
-    return LJF.matchesBlocked(identity, blockedCompanies);
-  }
+  /**
+   * Hide/show cards inside the results lazy-column. Never inject buttons here.
+   */
+  function applyListHiding() {
+    const listRoot = LJF.findResultsListRoot(document);
+    const searchRoot = listRoot || document;
+    const cards = LJF.findJobCards(searchRoot).filter(function (card) {
+      // Only act on cards that belong to the results list
+      if (listRoot) return listRoot.contains(card);
+      return LJF.isInResultsList(card) || !LJF.findDetailPane(document);
+    });
 
-  function applyCardState(card) {
-    const identity = LJF.extractCompanyFromCard(card);
-    if (!identity) {
-      card.classList.remove(HIDDEN_CLASS);
-      return { ok: false, identity: null };
-    }
-
-    if (shouldHide(identity)) {
-      card.classList.add(HIDDEN_CLASS);
-      return { ok: true, identity: identity, hidden: true };
-    }
-
-    card.classList.remove(HIDDEN_CLASS);
-
-    if (!settings.showBlockButton) {
-      return { ok: true, identity: identity, hidden: false };
-    }
-
-    if (card.querySelector('.' + BTN_CLASS)) {
-      card.setAttribute(PROCESSED_ATTR, '1');
-      return { ok: true, identity: identity, hidden: false, button: true };
-    }
-
-    const anchor = getAnchor(card);
-    const btn = createBlockButton(identity);
-    anchor.appendChild(btn);
-    card.setAttribute(PROCESSED_ATTR, '1');
-    return { ok: true, identity: identity, hidden: false, button: true };
-  }
-
-  function scanAndApply() {
-    if (!isJobsPath()) {
-      lastScanStats = {
-        path: location.pathname,
-        active: false,
-        cards: 0,
-        withCompany: 0,
-        buttons: 0,
-        hidden: 0,
-        samples: [],
-      };
-      return lastScanStats;
-    }
-
-    const cards = LJF.findJobCards(document);
-    let withCompany = 0;
-    let buttons = 0;
     let hidden = 0;
+    let withCompany = 0;
     const samples = [];
 
     cards.forEach(function (card, index) {
-      const result = applyCardState(card);
-      if (result.ok) withCompany += 1;
-      if (result.hidden) hidden += 1;
-      if (result.button || (card.querySelector && card.querySelector('.' + BTN_CLASS))) buttons += 1;
+      // Ensure no block button remains on list cards
+      const stray = card.querySelector('.' + BTN_CLASS);
+      if (stray) stray.remove();
+      card.removeAttribute(PROCESSED_ATTR);
+
+      const identity = LJF.extractCompanyFromCard(card);
+      if (!identity) {
+        showCardRow(card);
+        return;
+      }
+      withCompany += 1;
+
+      if (LJF.matchesBlocked(identity, blockedCompanies)) {
+        hideCardRow(card);
+        hidden += 1;
+      } else {
+        showCardRow(card);
+      }
+
       if (index < 5) {
         samples.push({
           tag: card.tagName,
           componentkey: card.getAttribute && card.getAttribute('componentkey'),
-          jobId:
-            (card.getAttribute && (card.getAttribute('data-occludable-job-id') || card.getAttribute('data-job-id'))) ||
-            null,
-          company: result.identity ? result.identity.displayName : null,
-          key: result.identity ? result.identity.key : null,
+          company: identity.displayName,
+          key: identity.key,
+          hidden: LJF.matchesBlocked(identity, blockedCompanies),
         });
       }
     });
 
+    return {
+      listRoot: listRoot
+        ? (listRoot.getAttribute('componentkey') || listRoot.getAttribute('data-testid') || listRoot.tagName)
+        : null,
+      cards: cards.length,
+      withCompany: withCompany,
+      hidden: hidden,
+      samples: samples,
+    };
+  }
+
+  /**
+   * Inject a single block button into the detail pane; capture logo + company URL.
+   */
+  function applyDetailButton() {
+    const pane = LJF.findDetailPane(document);
+    if (!pane) {
+      return { detail: false, button: false, company: null };
+    }
+
+    // Remove duplicate detail buttons
+    const existing = pane.querySelectorAll('.' + BTN_CLASS);
+    const identity = LJF.extractCompanyFromDetailPane(pane);
+    if (!identity) {
+      Array.prototype.forEach.call(existing, function (b) {
+        b.remove();
+      });
+      pane.removeAttribute(DETAIL_PROCESSED_ATTR);
+      return { detail: true, button: false, company: null };
+    }
+
+    if (LJF.matchesBlocked(identity, blockedCompanies)) {
+      Array.prototype.forEach.call(existing, function (b) {
+        b.remove();
+      });
+      // Detail stays visible; list hiding covers the job cards
+      return { detail: true, button: false, company: identity, blocked: true };
+    }
+
+    if (existing.length) {
+      // Refresh dataset key if company changed (SPA selection)
+      existing[0].dataset.ljfKey = identity.key;
+      existing[0].disabled = false;
+      existing[0].textContent = 'Bloquear empresa';
+      // Drop extras
+      for (let i = 1; i < existing.length; i++) existing[i].remove();
+      pane.setAttribute(DETAIL_PROCESSED_ATTR, '1');
+      return { detail: true, button: true, company: identity };
+    }
+
+    const anchor =
+      (LJF.findButtonAnchor && LJF.findButtonAnchor(pane)) ||
+      pane.querySelector('a[href*="/company/"]') ||
+      pane;
+
+    // Prefer inserting next to the company link row
+    const btn = createBlockButton(identity);
+    if (anchor.tagName === 'A' && anchor.parentElement) {
+      anchor.parentElement.appendChild(btn);
+    } else {
+      anchor.appendChild(btn);
+    }
+    pane.setAttribute(DETAIL_PROCESSED_ATTR, '1');
+    return { detail: true, button: true, company: identity };
+  }
+
+  function scanAndApply() {
+    if (!isJobsPath()) {
+      lastScanStats = { path: location.pathname, active: false };
+      return lastScanStats;
+    }
+
+    removeListButtons(document);
+    const listStats = applyListHiding();
+    const detailStats = applyDetailButton();
+
     lastScanStats = {
       path: location.pathname + location.search,
       active: true,
-      cards: cards.length,
-      withCompany: withCompany,
-      buttons: document.querySelectorAll('.' + BTN_CLASS).length,
-      hidden: hidden,
+      version: VERSION,
+      listRoot: listStats.listRoot,
+      cards: listStats.cards,
+      withCompany: listStats.withCompany,
+      hidden: listStats.hidden,
+      detail: detailStats.detail,
+      detailButton: !!detailStats.button,
+      detailCompany: detailStats.company
+        ? {
+            key: detailStats.company.key,
+            displayName: detailStats.company.displayName,
+            companyUrl: detailStats.company.companyUrl,
+            logoUrl: detailStats.company.logoUrl,
+          }
+        : null,
       blockedCount: Object.keys(blockedCompanies || {}).length,
-      samples: samples,
+      samples: listStats.samples,
     };
 
     log('scan', lastScanStats);
 
-    // Always surface a one-line summary when nothing was found (helps real-page diagnosis)
-    if (!cards.length || !withCompany) {
+    if (!listStats.cards) {
       logAlways(
-        'Diagnóstico: tarjetas=' +
-          cards.length +
-          ', con empresa=' +
-          withCompany +
-          ', botones=' +
-          lastScanStats.buttons +
-          ' en ' +
-          location.pathname +
-          ' — activa depuración con localStorage.ljfDebug="1" y recarga; luego LJFDebug.status()'
+        'Diagnóstico: 0 tarjetas en lazy-column. Activa debug: localStorage.ljfDebug="1"; LJFDebug.status()'
       );
     }
 
@@ -240,29 +325,32 @@
       return;
     }
 
-    const root = findListRoot();
+    const root = findObserverRoot();
     if (observer && observedRoot === root) return;
 
     teardownObserver();
-
     observedRoot = root;
     observer = new MutationObserver(function (mutations) {
       for (let i = 0; i < mutations.length; i++) {
         const m = mutations[i];
-        if ((m.addedNodes && m.addedNodes.length) || (m.type === 'attributes' && m.attributeName === 'componentkey')) {
+        if (m.addedNodes && m.addedNodes.length) {
           scheduleScan();
           return;
         }
       }
     });
+    observer.observe(root, { childList: true, subtree: true });
 
-    observer.observe(root, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['componentkey', 'data-occludable-job-id', 'data-job-id'],
-    });
-    log('MutationObserver anclado a', root === document.body ? 'body' : root.tagName + (root.className ? '.' + String(root.className).split(' ')[0] : ''));
+    // Also observe detail pane swaps (job selection)
+    const detail = LJF.findDetailPane(document);
+    if (detail && detail !== root) {
+      observer.observe(detail, { childList: true, subtree: true });
+    }
+
+    log(
+      'MutationObserver anclado a',
+      root === document.body ? 'body' : root.getAttribute('componentkey') || root.tagName
+    );
   }
 
   function onRouteMaybeChanged(reason) {
@@ -275,7 +363,7 @@
     } else if (!nowJobs && active) {
       active = false;
       teardownObserver();
-      resetProcessedCards();
+      resetProcessed();
     } else if (nowJobs) {
       observedRoot = null;
       scheduleScan();
@@ -284,7 +372,6 @@
 
   function watchSpaNavigation() {
     let lastUrl = location.href;
-
     const notify = function (reason) {
       if (location.href === lastUrl && reason !== 'force') return;
       lastUrl = location.href;
@@ -295,7 +382,6 @@
       notify('popstate');
     });
 
-    // LinkedIn uses history.pushState / replaceState heavily
     ['pushState', 'replaceState'].forEach(function (method) {
       const original = history[method];
       if (typeof original !== 'function') return;
@@ -315,21 +401,25 @@
     }, 800);
   }
 
-  function resetProcessedCards() {
-    document.querySelectorAll('[' + PROCESSED_ATTR + ']').forEach(function (el) {
+  function resetProcessed() {
+    document.querySelectorAll('[' + PROCESSED_ATTR + '], [' + DETAIL_PROCESSED_ATTR + ']').forEach(function (el) {
       el.removeAttribute(PROCESSED_ATTR);
-      const btn = el.querySelector('.' + BTN_CLASS);
-      if (btn) btn.remove();
-      el.classList.remove(HIDDEN_CLASS);
+      el.removeAttribute(DETAIL_PROCESSED_ATTR);
     });
-    // Also remove orphan buttons if cards were re-rendered without the attr
     document.querySelectorAll('.' + BTN_CLASS).forEach(function (btn) {
       btn.remove();
+    });
+    document.querySelectorAll('.' + HIDDEN_CLASS).forEach(function (el) {
+      el.classList.remove(HIDDEN_CLASS);
     });
   }
 
   function init() {
-    logAlways('content script v' + VERSION + ' cargado en', location.pathname, debugEnabled() ? '(debug ON)' : '(debug OFF — localStorage.ljfDebug="1")');
+    logAlways(
+      'content script v' + VERSION + ' cargado en',
+      location.pathname,
+      debugEnabled() ? '(debug ON)' : '(debug OFF)'
+    );
 
     LJF.storage.loadAll().then(function (all) {
       blockedCompanies = all.blockedCompanies || {};
@@ -345,7 +435,7 @@
     LJF.storage.onBlockedChange(function (map) {
       blockedCompanies = map || {};
       if (!isJobsPath()) return;
-      resetProcessedCards();
+      resetProcessed();
       scanAndApply();
     });
   }
@@ -363,19 +453,12 @@
       return LJF.storage.loadAll().then(function (all) {
         blockedCompanies = all.blockedCompanies || {};
         settings = all.settings || settings;
-        resetProcessedCards();
+        resetProcessed();
         return scanAndApply();
       });
     },
   };
 
-  /**
-   * Console helpers for real LinkedIn diagnosis:
-   *   localStorage.ljfDebug = '1'; location.reload();
-   *   LJFDebug.status()
-   *   LJFDebug.scan()
-   *   LJFDebug.enable()
-   */
   globalThis.LJFDebug = {
     version: VERSION,
     enable: function () {
@@ -384,7 +467,7 @@
       } catch (_) {
         globalThis.__LJF_DEBUG__ = true;
       }
-      logAlways('Debug activado. Recarga la página o llama LJFDebug.scan()');
+      logAlways('Debug activado. Recarga o LJFDebug.scan()');
     },
     disable: function () {
       try {
@@ -400,7 +483,7 @@
       return stats;
     },
     scan: function () {
-      resetProcessedCards();
+      resetProcessed();
       const stats = scanAndApply();
       console.info('[LJF] scan', stats);
       return stats;
