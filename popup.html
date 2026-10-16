@@ -78,6 +78,42 @@
         border-radius: 8px;
       }
 
+      .logo-wrap {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #eef3f8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .logo-wrap img.logo {
+        width: 36px;
+        height: 36px;
+        object-fit: cover;
+        display: block;
+      }
+
+      .logo-fallback {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      a.name {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+        word-break: break-word;
+      }
+
+      a.name:hover {
+        text-decoration: underline;
+      }
+
       .meta {
         min-width: 0;
         flex: 1;

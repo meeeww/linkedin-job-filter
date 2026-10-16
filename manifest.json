@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LinkedIn Job Filter",
   "description": "Bloquea empresas en LinkedIn Jobs y oculta sus ofertas automáticamente (solo en tu navegador).",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "permissions": ["storage"],
   "host_permissions": ["https://www.linkedin.com/*"],
   "action": {
