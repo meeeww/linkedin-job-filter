@@ -40,13 +40,13 @@ Extensión de **Google Chrome (Manifest V3)** en JavaScript y CSS puro, sin back
 ### MVP (fase inicial)
 
 - [x] Plan del proyecto (este documento)
-- [ ] Manifest V3 + content script + estilos + popup
-- [ ] Botón «Bloquear empresa» en resultados de búsqueda de empleos
-- [ ] Persistencia de la lista negra en `chrome.storage.local`
-- [ ] Ocultación automática de ofertas de empresas bloqueadas
-- [ ] Soporte de contenido cargado dinámicamente (`MutationObserver`)
-- [ ] Popup para ver la lista y desbloquear empresas
-- [ ] Ocultación client-side de ofertas promocionadas de empresas bloqueadas (sin bloquear la entrega de ads)
+- [x] Manifest V3 + content script + estilos + popup
+- [x] Botón «Bloquear empresa» en resultados de búsqueda de empleos
+- [x] Persistencia de la lista negra en `chrome.storage.local`
+- [x] Ocultación automática de ofertas de empresas bloqueadas
+- [x] Soporte de contenido cargado dinámicamente (`MutationObserver`)
+- [x] Popup para ver la lista y desbloquear empresas
+- [x] Ocultación client-side de ofertas promocionadas de empresas bloqueadas (sin bloquear la entrega de ads)
 
 ### Más adelante (post-MVP)
 
@@ -83,17 +83,20 @@ linkedin-job-filter/
 ├── content.js                # Detección, botón, MutationObserver, ocultación
 ├── styles.css                # Estilos del botón y estados oculto/colapsado
 ├── popup.html                # UI para gestionar la lista negra
-├── popup.js                  # Leer/escribir storage, desbloquear, import/export
+├── popup.js                  # Leer/escribir storage, desbloquear
 ├── options.html              # (post-MVP) Preferencias
 ├── options.js                # (post-MVP)
 ├── lib/
 │   ├── storage.js            # API de lectura/escritura de la blocklist
 │   ├── company.js            # Normalización de claves de empresa
 │   └── selectors.js          # Selectores centralizados + fallbacks
-└── icons/
-    ├── icon16.png
-    ├── icon48.png
-    └── icon128.png
+├── icons/
+│   ├── icon16.png
+│   ├── icon48.png
+│   └── icon128.png
+└── test/
+    ├── fixture.html          # Página local que simula tarjetas de empleo
+    └── company.test.js       # Checks de normalización de claves (Node)
 ```
 
 ### Responsabilidades
@@ -302,12 +305,29 @@ Formato propuesto: **JSON** versionado.
 3. Activar **Modo de desarrollador**.
 4. **Cargar extensión sin empaquetar** y seleccionar la carpeta del proyecto (raíz con `manifest.json`).
 5. Abrir LinkedIn Jobs (`/jobs/search`) y comprobar el botón y la ocultación.
-6. Tras cada cambio en JS/CSS: recargar la extensión y refrescar la pestaña de LinkedIn.
+6. Tras cada cambio en JS/CSS: recargar la extensión (icono de actualizar en `chrome://extensions`) y refrescar la pestaña de LinkedIn.
+
+### Prueba local sin LinkedIn (fixture)
+
+Sin cuenta de LinkedIn puedes validar la lógica de detección, botón, bloqueo, ocultación y `MutationObserver`:
+
+1. Abre `test/fixture.html` directamente en Chrome (`Archivo → Abrir archivo…`, o arrastra el HTML a una pestaña).
+2. Debe aparecer el botón **Bloquear empresa** en cada tarjeta simulada.
+3. Al bloquear, las tarjetas de esa empresa se ocultan; **Añadir tarjeta** simula scroll infinito.
+4. **Desbloquear todas** vacía la lista en memoria; **Ver storage** muestra el mapa actual en la barra de estado.
+
+Checks de normalización de claves (Node):
+
+```bash
+node test/company.test.js
+```
+
+> El fixture usa un `chrome.storage` en memoria (fallback de `lib/storage.js`). En LinkedIn real se usa `chrome.storage.local` de la extensión cargada unpacked.
 
 ### Requisitos
 
 - Google Chrome reciente (Manifest V3).
-- Cuenta de LinkedIn para pruebas manuales.
+- Cuenta de LinkedIn para pruebas manuales en producción.
 - Sin build step en MVP (JS/CSS planos). Opcional más adelante: bundler solo si se justifica.
 
 ---
@@ -369,34 +389,34 @@ Formato propuesto: **JSON** versionado.
 
 ### Fase 1 — Esqueleto MV3
 
-- [ ] Crear `manifest.json` (MV3, permisos mínimos)
-- [ ] Content script vacío + `styles.css` + popup mínimo
-- [ ] Iconos placeholder
-- [ ] Carga unpacked y smoke test en LinkedIn
+- [x] Crear `manifest.json` (MV3, permisos mínimos)
+- [x] Content script vacío + `styles.css` + popup mínimo
+- [x] Iconos placeholder
+- [ ] Carga unpacked y smoke test en LinkedIn *(requiere prueba manual con cuenta)*
 
 ### Fase 2 — Detección y botón
 
-- [ ] `lib/selectors.js` con selectores para `/jobs/search`
-- [ ] Extracción de empresa (ID/URL/nombre)
-- [ ] Inyección idempotente del botón «Bloquear empresa»
-- [ ] Escritura en `chrome.storage.local` al bloquear
+- [x] `lib/selectors.js` con selectores para `/jobs/search`
+- [x] Extracción de empresa (ID/URL/nombre)
+- [x] Inyección idempotente del botón «Bloquear empresa»
+- [x] Escritura en `chrome.storage.local` al bloquear
 
 ### Fase 3 — Filtrado automático
 
-- [ ] Aplicar ocultación a tarjetas cuya empresa esté en la lista
-- [ ] `MutationObserver` con debounce para scroll infinito
-- [ ] Reaccionar a `storage.onChanged` (desbloqueo desde popup)
-- [ ] Manejo básico de ofertas promocionadas (client-side)
+- [x] Aplicar ocultación a tarjetas cuya empresa esté en la lista
+- [x] `MutationObserver` con debounce para scroll infinito
+- [x] Reaccionar a `storage.onChanged` (desbloqueo desde popup)
+- [x] Manejo básico de ofertas promocionadas (client-side)
 
 ### Fase 4 — Popup de gestión
 
-- [ ] Listar empresas bloqueadas
-- [ ] Desbloquear una o varias
-- [ ] Estados vacíos y mensajes de privacidad / ads
+- [x] Listar empresas bloqueadas
+- [x] Desbloquear una o varias
+- [x] Estados vacíos y mensajes de privacidad / ads
 
 ### Fase 5 — Robustez y UX
 
-- [ ] Fallbacks de selectores y marcado `data-ljf-*`
+- [x] Fallbacks de selectores y marcado `data-ljf-*` *(MVP básico; ampliar tras verifying en LinkedIn real)*
 - [ ] Setting ocultar vs colapsar + «Mostrar»
 - [ ] Cobertura `/jobs/collections` y panel de detalle
 - [ ] Import / export JSON
@@ -456,4 +476,4 @@ Por definir (p. ej. MIT) antes de publicar en la Store o abrir el repo de forma 
 
 ## Resumen
 
-Esta extensión da a la persona usuaria control local sobre qué empresas ve en LinkedIn Jobs: un botón por oferta, una lista negra en `chrome.storage`, y ocultación automática — también en contenido cargado al hacer scroll — sin backend y sin que ningún dato salga del navegador. El trabajo siguiente es implementar el esqueleto Manifest V3 y el content script sobre `/jobs/search`, siguiendo las fases del roadmap.
+Esta extensión da a la persona usuaria control local sobre qué empresas ve en LinkedIn Jobs: un botón por oferta, una lista negra en `chrome.storage`, y ocultación automática — también en contenido cargado al hacer scroll — sin backend y sin que ningún dato salga del navegador. El **MVP (fases 1–4)** está implementado; falta validación manual en LinkedIn real y el trabajo post-MVP (options, import/export, collapse, Store).

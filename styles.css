@@ -1,0 +1,62 @@
+/* LinkedIn Job Filter — button + hide states */
+
+.ljf-block-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #5c6f7c;
+  background: #f3f6f8;
+  border: 1px solid #cfd9de;
+  border-radius: 4px;
+  cursor: pointer;
+  vertical-align: middle;
+  white-space:nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ljf-block-btn:hover,
+.ljf-block-btn:focus-visible {
+  color: #cc1016;
+  background: #fff0f0;
+  border-color: #e7b4b4;
+  outline: none;
+}
+
+.ljf-block-btn:active {
+  transform: translateY(1px);
+}
+
+.ljf-block-btn[disabled],
+.ljf-block-btn.is-blocked {
+  opacity: 0.6;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Default hide mode: remove from layout */
+.ljf-hidden {
+  display: none !important;
+}
+
+/* Post-MVP collapse mode (class reserved) */
+.ljf-collapsed {
+  max-height: 36px !important;
+  overflow: hidden !important;
+  opacity: 0.85;
+}
+
+.ljf-collapse-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #56687a;
+  background: #f3f6f8;
+  border-bottom: 1px solid #e8e8e8;
+}

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>LJF — Fixture local de LinkedIn Jobs</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        margin: 0;
+        background: #f3f2ef;
+        color: #1b1f23;
+      }
+      header {
+        padding: 16px 24px;
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      header h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
+      header p {
+        margin: 0;
+        color: #666;
+        font-size: 13px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px 24px;
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .toolbar button {
+        padding: 6px 12px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      #status {
+        padding: 8px 24px;
+        font-size: 13px;
+        color: #0a66c2;
+      }
+      .jobs-search-results-list {
+        max-width: 640px;
+        margin: 16px 24px;
+        padding: 0;
+        list-style: none;
+      }
+      /* Mimics LinkedIn scaffold list item + job-card-container */
+      li.jobs-search-results__list-item {
+        margin-bottom: 8px;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 12px 16px;
+      }
+      .job-card-container__title {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .job-card-container__primary-description {
+        margin: 0;
+        font-size: 14px;
+        color: #000000e6;
+      }
+      .job-card-container__footer-item--promoted {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #666;
+      }
+      a {
+        color: #0a66c2;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Fixture local — LinkedIn Job Filter</h1>
+      <p>
+        Simula tarjetas de <code>/jobs/search</code> para probar botones, bloqueo,
+        ocultación y MutationObserver sin iniciar sesión en LinkedIn.
+      </p>
+    </header>
+
+    <div class="toolbar">
+      <button type="button" id="btn-add">Añadir tarjeta (scroll simulado)</button>
+      <button type="button" id="btn-unblock-all">Desbloquear todas</button>
+      <button type="button" id="btn-show-storage">Ver storage</button>
+    </div>
+    <div id="status">Listo.</div>
+
+    <ul class="jobs-search-results-list" id="job-list">
+      <li class="jobs-search-results__list-item" data-occludable-job-id="1001">
+        <div class="job-card-container">
+          <h3 class="job-card-container__title">Ingeniero Frontend</h3>
+          <div class="job-card-container__primary-description">
+            <a href="https://www.linkedin.com/company/acme-corp/">Acme Corp</a>
+          </div>
+        </div>
+      </li>
+      <li class="jobs-search-results__list-item" data-occludable-job-id="1002">
+        <div class="job-card-container">
+          <h3 class="job-card-container__title">Analista de Datos</h3>
+          <div class="job-card-container__primary-description">
+            <a href="https://www.linkedin.com/company/12345678/">Beta Analytics</a>
+          </div>
+        </div>
+      </li>
+      <li class="jobs-search-results__list-item" data-occludable-job-id="1003">
+        <div class="job-card-container">
+          <h3 class="job-card-container__title">Product Manager</h3>
+          <div class="artdeco-entity-lockup__subtitle">Gamma Soft</div>
+        </div>
+      </li>
+      <li class="jobs-search-results__list-item" data-occludable-job-id="1004">
+        <div class="job-card-container">
+          <h3 class="job-card-container__title">SRE (promocionado)</h3>
+          <div class="job-card-container__primary-description">
+            <a href="https://www.linkedin.com/company/acme-corp/">Acme Corp</a>
+          </div>
+          <div class="job-card-container__footer-item--promoted">Promocionado</div>
+        </div>
+      </li>
+    </ul>
+
+    <script src="../lib/selectors.js"></script>
+    <script src="../lib/company.js"></script>
+    <script src="../lib/storage.js"></script>
+    <script src="../content.js"></script>
+    <script>
+      (function () {
+        const status = document.getElementById('status');
+        const list = document.getElementById('job-list');
+        let nextId = 2000;
+
+        function setStatus(msg) {
+          status.textContent = msg;
+        }
+
+        document.getElementById('btn-add').addEventListener('click', function () {
+          const id = nextId++;
+          const li = document.createElement('li');
+          li.className = 'jobs-search-results__list-item';
+          li.setAttribute('data-occludable-job-id', String(id));
+          li.innerHTML =
+            '<div class="job-card-container">' +
+            '<h3 class="job-card-container__title">Nuevo rol #' +
+            id +
+            '</h3>' +
+            '<div class="job-card-container__primary-description">' +
+            '<a href="https://www.linkedin.com/company/acme-corp/">Acme Corp</a>' +
+            '</div></div>';
+          list.appendChild(li);
+          setStatus('Tarjeta añadida #' + id + ' (el observer debería inyectar el botón / ocultar si está bloqueada).');
+        });
+
+        document.getElementById('btn-unblock-all').addEventListener('click', function () {
+          LJF.storage._saveBlocked({}).then(function () {
+            if (globalThis.LJFContent && LJFContent.refreshFromStorage) {
+              return LJFContent.refreshFromStorage().then(function () {
+                setStatus('Lista negra vaciada.');
+              });
+            }
+            setStatus('Lista negra vaciada.');
+          });
+        });
+
+        document.getElementById('btn-show-storage').addEventListener('click', function () {
+          LJF.storage.getBlockedCompanies().then(function (map) {
+            setStatus('Storage: ' + JSON.stringify(map, null, 0));
+            console.log('blockedCompanies', map);
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
