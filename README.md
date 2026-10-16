@@ -41,11 +41,11 @@ Extensión de **Google Chrome (Manifest V3)** en JavaScript y CSS puro, sin back
 
 - [x] Plan del proyecto (este documento)
 - [x] Manifest V3 + content script + estilos + popup
-- [x] Botón «Bloquear empresa» en resultados de búsqueda de empleos
-- [x] Persistencia de la lista negra en `chrome.storage.local`
-- [x] Ocultación automática de ofertas de empresas bloqueadas
+- [x] Botón «Bloquear empresa» en el panel de detalle del empleo (no en la lista `lazy-column`)
+- [x] Persistencia de la lista negra en `chrome.storage.local` (incluye logo URL + company URL)
+- [x] Ocultación automática de ofertas de empresas bloqueadas en la `lazy-column` (también al hacer scroll)
 - [x] Soporte de contenido cargado dinámicamente (`MutationObserver`)
-- [x] Popup para ver la lista y desbloquear empresas
+- [x] Popup para ver la lista (logo + enlace) y desbloquear empresas
 - [x] Ocultación client-side de ofertas promocionadas de empresas bloqueadas (sin bloquear la entrega de ads)
 
 ### Más adelante (post-MVP)
@@ -350,7 +350,9 @@ LJFDebug.scan();   // fuerza un re-escaneo
 Notas:
 
 - El content script se inyecta en **todo** `linkedin.com` (para sobrevivir navegación SPA) pero solo actúa en rutas `/jobs/*`.
-- En `/jobs/search-results/` las tarjetas son `div[role=button][componentkey^=job-card-component-ref-]`; la empresa se infiere del texto de los `<p>` cuando no hay enlace `/company/`.
+- En `/jobs/search-results/` la lista es `[data-testid=lazy-column][componentkey=SearchResultsMainContent]`; las tarjetas son `div[role=button][componentkey^=job-card-component-ref-]`.
+- **Ocultación** se aplica a esas tarjetas de la lista. El botón **Bloquear empresa** solo aparece en el panel de detalle (`data-sdui-screen*="SemanticJobDetails"`), junto al enlace/logo de empresa (ahí sí hay `/company/` + logo).
+- Entradas antiguas del popup sin logo/URL muestran un placeholder y un enlace de búsqueda de empresas en LinkedIn.
 
 ### Requisitos
 
