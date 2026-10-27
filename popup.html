@@ -177,10 +177,22 @@
       <div id="list-root">
         <p class="empty">Cargando…</p>
       </div>
+      <section class="settings" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.4;cursor:pointer;">
+          <input type="checkbox" id="opt-dismiss" style="margin-top:2px;" />
+          <span>
+            <strong>Usar dismiss nativo de LinkedIn</strong> (opt-in, experimental).
+            Tras bloquear, intenta descartar ofertas visibles con la misma petición same-origin
+            que LinkedIn. Requiere haber capturado antes un dismiss nativo (⋯ → Descartar) con
+            <code>ljfDebug=1</code>.
+          </span>
+        </label>
+        <p id="dismiss-status" style="margin:8px 0 0;font-size:11px;color:var(--muted);"></p>
+      </section>
     </main>
     <footer>
-      La ocultación es solo en tu navegador. LinkedIn puede seguir sirviendo anuncios;
-      esta extensión no bloquea la red.
+      La ocultación es solo en tu navegador (DOM). LinkedIn puede seguir sirviendo anuncios;
+      esta extensión no bloquea la red ni guarda cookies.
     </footer>
     <script src="lib/company.js"></script>
     <script src="lib/storage.js"></script>
